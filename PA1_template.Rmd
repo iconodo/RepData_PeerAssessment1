@@ -1,25 +1,118 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
-
+Reproducible Research: Peer Assessment 1
+=========================================
+####(... or what else can we see about anonymous' walking data gathering)
 
 ## Loading and preprocessing the data
+Packages used:
+```{r message=F, warning=F}
+library(lubridate)
+library(dplyr)
+library(lattice)
+library(ggplot2)
+```
 
-
+Dataset loading + 
+        day_of_week/month_of_year extracting and assigning to columns 
+        'dowk', "mofyear"
+```{r}
+hishersteps <- read.csv("activity.csv")
+hishersteps <- mutate(hishersteps, dowk = wday(hishersteps$date))
+hishersteps <- mutate(hishersteps, mofyear = month(ymd(date))) 
+```
 
 ## What is mean total number of steps taken per day?
 
+- The total number of steps per day (ignoring missing values)
+```{r}
+sum(hishersteps$steps, na.rm = TRUE)
+```
+
+- Histogram of the total number of steps taken each day (ignoring missing values)
+```{r}
+byday <- group_by(hishersteps, mofyear, dowk)
+par(mfrow = c(2, 1), mar = c(4, 4, 2, 1))
+hist(subset(byday, (mofyear == 10 & steps > 0))$steps, 
+                col = "green", xlab = "# of steps in mean_minus_14days chunks",
+                main = "Histogram of October steps", 
+                breaks = mean(hishersteps$steps, na.rm = TRUE)-14)
+hist(subset(byday, (mofyear == 11 & steps > 0))$steps, 
+                col = "green", xlab = "# of steps in mean_minus_14days chunks",
+                main = "Histogram of November steps", 
+                breaks = mean(hishersteps$steps, na.rm = TRUE)-14)
+```
+
+- The mean and median of total steps per day (ignoring missing values)
+```{r}
+meanNmed <- summarize(hishersteps, stepsMean = mean(hishersteps$steps, na.rm = TRUE), 
+                                   stepsMedian =median(hishersteps$steps, na.rm = TRUE))
+head(meanNmed)
+```
 
 
 ## What is the average daily activity pattern?
+- time series plot of the 5-minute interval (x-axis) and the average number of
+steps taken, averaged across all days (y-axis) 
+```{r}
+byinterval <- group_by(byday, interval, date)
+byinterval2 <- summarize(byinterval, meanOfday = mean(steps, na.rm = TRUE))
+xyplot(meanOfday ~ interval, data = byinterval2, na.rm = TRUE, 
+                                col = rgb(0, 0, 0, 0.50),
+                                main = "Mean of steps by interval by day",
+                                xlab = "5 min. Intervals",
+                                ylab = "Means of day's steps",
+                                breaks = 10)
 
 
+
+```
+
+- Which 5-minute interval... contains the maximum number of steps?
+
+```{r}
+maxSteps <-max(as.numeric(byinterval2$meanOfday), na.rm = TRUE)
+theInterval <- filter(byinterval2, meanOfday == maxSteps)
+theInterval$interval
+```
 
 ## Imputing missing values
+- Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+```{r}
+sum(is.na(hishersteps$steps))
+```
+- Devise a strategy for filling in all of the missing values in the dataset.
+```{r}
+minSteps <-min(as.numeric(byinterval2$meanOfday), na.rm = TRUE)
+fillerStep <- (minSteps + maxSteps)/2
+```
+- Create a new dataset with filled missing values
+```{r}
+hisherfilled <- hishersteps
+hisherfilled[,1:1][is.na(hisherfilled[,1:1])] <-fillerStep
+```
+- Histogram with NAs replaced
+```{r}
+byday2 <- group_by(hisherfilled, mofyear, dowk)
+#head(byday2)
+par(mfrow = c(2, 1), mar = c(4, 4, 2, 1))
+hist(subset(byday2, (mofyear == 10 & steps > 0))$steps, 
+                col = "green", xlab = "# of steps in mean_minus_14days chunks",
+                main = "Histogram of October steps (NAs replaced)", 
+                breaks = mean(hishersteps$steps, na.rm = TRUE)-14)
+hist(subset(byday2, (mofyear == 11 & steps > 0))$steps, 
+                col = "green", xlab = "# of steps in mean_minus_14days chunks",
+                main = "Histogram of November steps (NAs replaced)", 
+                breaks = mean(hishersteps$steps, na.rm = TRUE)-14)
+```
 
+- What is the impact of imputing missing data on total daily number of steps?
+1. Number of steps with missing data
+```{r}
+sum(hishersteps$steps, na.rm = TRUE)
+```
+2. Number of steps after filling missing rows with half maxSteps value
+```{r}        
+sum(hisherfilled$steps, na.rm = TRUE)
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
